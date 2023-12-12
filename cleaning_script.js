@@ -92,7 +92,7 @@ function runAutoFix(targetWindow) {
 
       textBox.value = mergeDuplicateRefs(temporaryText) ;
 
-      var sumarioChanged = sumarioEl.value + ' + desduplicando referências usando [[user:TiagoLubiana/Script de ajustes.js|script]]';
+      var sumarioChanged = sumarioEl.value + ' + desduplicando referências usando [[user:TiagoLubiana/Desduplicador.js|script desduplicador]]';
       sumarioEl.value = sumarioChanged;
 
       if (!(targetWindow.ve && targetWindow.ve.init)) {
