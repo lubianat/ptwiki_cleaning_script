@@ -1,6 +1,28 @@
+// Adaptado de https://pt.wikipedia.org/wiki/Usu%C3%A1rio:Luizdl/Script_de_ajustes.js
+
 mw.loader.using('mediawiki.storage').then(function () {
   mw.storage.session.set( 'client-error-opt-out', '1' );
 });
+
+function mergeDuplicateRefs(text) {
+    var refPattern = /<ref\s+name\s*=\s*"(.*?)">\s*{{(.*?)}}\s*<\/ref>/g;
+    var foundRefs = {};
+    var modifiedText = text;
+
+    modifiedText = modifiedText.replace(refPattern, function(match, refName, refContent) {
+        if (foundRefs.hasOwnProperty(refName)) {
+            // If already found, replace with shortcut
+            return '<ref name="' + refName + '" />';
+        } else {
+            // If not found, keep the full reference and mark as found
+            foundRefs[refName] = true;
+            return match;
+        }
+    });
+
+    return modifiedText;
+}
+
 
 novoEditor = mw.user.options.get('visualeditor-newwikitext') == '1';
 
@@ -20,7 +42,7 @@ function tradMes(mes) {
     return 'falhou';
 }
 
-//dates
+//datas
 var cvGrauO = "([^\\|\\}]*°[^\\|\\}]*[\\|\\}])",
     diaMesAno = "\\s*(\\d+(?:[–\\-\\/]\\d+|))\\s+([A-Za-zç]+)\\s+(\\d\\d\\d\\d?)\\.?",
     linkDiaMesAno = "\\s*\\[\\[0?(\\d+(?:[–\\-\\/]\\d+|))\\s+de\\s+([A-Za-zç]+)\\]\\]\\s+de\\s+\\[?\\[?(\\d+)\\]?\\]?\\.?",
@@ -36,8 +58,7 @@ var cvGrauO = "([^\\|\\}]*°[^\\|\\}]*[\\|\\}])",
     prData = "\\s*\\{\\{\\s*[Dd]ata\\s*\\|\\s*(\\d\\d\\d\\d?)\\s*\\|\\s*(\\d\\d?)\\s*\\|\\s*(\\d\\d?)[^\{\}]*\\}\\}\\.?",
     prDataExt = "\\s*\\{\\{[Dd]ataExt\\s*\\|\\s*(\\d\\d?)\\s*\\|\\s*(\\d\\d?)\\s*\\|\\s*(\\d\\d\\d\\d?)[^\{\}]*\\}\\}\\.?",
     marco = "s*((:?\\d\\d?(?:[–\\-\\/]\\d\\d?|)[\\.º]?[º]?\\s+de\\s+|)[Mm]arco\\s+de\\s+\\d\\d\\d\\d?)\\.?";
-
-//parameters
+//parâmetros
 var data = "\\|\\s*(?:dat[ea]|year|ano)\\s*=",
     transmissao = "\\|\\s*(?:transmissão|air\\-?date)\\s*=",
     acessodata = "\\|\\s*(?:acc?esso?\\-?dat[ea]|acc?essadoem)\\s*=",
@@ -64,289 +85,39 @@ function rarquivodata(alt, padrao) {
     return rDatas('|arquivodata=' + alt, padrao);
 }
 
+function replaceDate(match, pattern, replacement) {
+    return match.replace(pattern, replacement);
+}
+
+function formatDate(match) {
+    return match.replace(/[\-\/]/, '–').replace('°', 'º').replace(/[Mm]arco/, 'março');
+}
+
+function processDate(match) {
+    let parts = match.split(/\s+de\s+/);
+    if (parts.length === 3) {
+        parts[1] = tradMes(parts[1]); // Translate month name
+        return parts.join(' de ');
+    }
+    return match;
+}
+
+function processData(match) {
+    return (mesesPt[parseInt(match) - 1]) ? processDate(match) : match;
+}
+
 citacoes = {
     datas: {
         cond: [
             {
-                reg: /\|\s*(?:ano|year)\s*=\s*((:?\d\d?[\.º°]?[º°]?\s+de\s+|)[A-Za-zç]+\s+de\s+\d\d\d\d?)/, subs: function (achou) {
-                    return rdata(achou[1], achou[0]);
-                }
-            }, {
-                reg: /\|\s*(?:ano|year)\s*=\s*\[\[(\d\d\d\d?)\]\]/, subs: function (achou) {
-                    return '|ano=' + achou[1];
-                }
-            }, {
-                reg: new RegExp(data + cvGrauO), subs: function (achou) {
-                    return rdata(achou[1].replace('°', 'º'), achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + marco), subs: function (achou) {
-                    return rdata(achou[1].replace(/[Mm]arco/, 'março'), achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + diaMesAno), subs: function (achou) {
-                    return rdata(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + linkDiaMesAno), subs: function (achou) {
-                    return rdata(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + mesDiaAno), subs: function (achou) {
-                    return rdata(achou[2].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[1]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + mesAno), subs: function (achou) {
-                    return rdata(tradMes(achou[1]) + ' de ' + achou[2], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + mesMesAno), subs: function (achou) {
-                    return rdata(tradMes(achou[1]) + '–' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + nAnoMes), subs: function (achou) {
-                    if (mesesPt[achou[2] - 1])
-                        return rdata(mesesPt[achou[2] - 1] + ' de ' + achou[1] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(data + nMesAno), subs: function (achou) {
-                    if (mesesPt[achou[1] - 1])
-                        return rdata(mesesPt[achou[1] - 1] + ' de ' + achou[2] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(data + sAnoMesDia), subs: function (achou) {
-                    return rdata(achou[3] + ' de ' + tradMes(achou[2]) + ' de ' + achou[1] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + sDiaMesAno), subs: function (achou) {
-                    return rdata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + _0diaMesAno), subs: function (achou) {
-                    return rdata(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + diaMesVAno), subs: function (achou) {
-                    return rdata(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + prData), subs: function (achou) {
-                    return rdata(achou[3] + ' de ' + mesesPt[achou[2] - 1] + ' de ' + achou[1], achou[0]);
-                }
-            }, {
-                reg: new RegExp(data + prDataExt), subs: function (achou) {
-                    return rdata(achou[1] + ' de ' + mesesPt[achou[2] - 1] + ' de ' + achou[3], achou[0]);
-                }
-            },
-            {
-                reg: new RegExp(transmissao + cvGrauO), subs: function (achou) {
-                    return rtransmissao(achou[1].replace('°', 'º'), achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + diaMesAno), subs: function (achou) {
-                    return rtransmissao(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + linkDiaMesAno), subs: function (achou) {
-                    return rtransmissao(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + mesDiaAno), subs: function (achou) {
-                    return rtransmissao(achou[2].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[1]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + mesAno), subs: function (achou) {
-                    return rtransmissao(tradMes(achou[1]) + ' de ' + achou[2], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + mesMesAno), subs: function (achou) {
-                    return rtransmissao(tradMes(achou[1]) + '–' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + nAnoMes), subs: function (achou) {
-                    if (mesesPt[achou[2] - 1])
-                        return rtransmissao(mesesPt[achou[2] - 1] + ' de ' + achou[1] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(transmissao + nMesAno), subs: function (achou) {
-                    if (mesesPt[achou[1] - 1])
-                        return rtransmissao(mesesPt[achou[1] - 1] + ' de ' + achou[2] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(transmissao + sAnoMesDia), subs: function (achou) {
-                    return rtransmissao(achou[3] + ' de ' + tradMes(achou[2]) + ' de ' + achou[1] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + sDiaMesAno), subs: function (achou) {
-                    return rtransmissao(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + _0diaMesAno), subs: function (achou) {
-                    return rtransmissao(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + prData), subs: function (achou) {
-                    return rtransmissao(achou[3] + ' de ' + mesesPt[achou[2] - 1] + ' de ' + achou[1], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + prDataExt), subs: function (achou) {
-                    return rtransmissao(achou[1] + ' de ' + mesesPt[achou[2] - 1] + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(transmissao + diaMesVAno), subs: function (achou) {
-                    return rtransmissao(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            },
-            {
-                reg: new RegExp(acessodata + cvGrauO), subs: function (achou) {
-                    return racessodata(achou[1].replace('°', 'º'), achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + diaMesAno), subs: function (achou) {
-                    return racessodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + mesDiaAno), subs: function (achou) {
-                    return racessodata(achou[2] + ' de ' + tradMes(achou[1]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + linkDiaMesAno), subs: function (achou) {
-                    return racessodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + prData), subs: function (achou) {
-                    return racessodata(achou[3] + ' de ' + mesesPt[achou[2] - 1] + ' de ' + achou[1], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + prDataExt), subs: function (achou) {
-                    return racessodata(achou[1] + ' de ' + mesesPt[achou[2] - 1] + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + diaMesVAno), subs: function (achou) {
-                    return racessodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + nAnoMes), subs: function (achou) {
-                    if (mesesPt[achou[2] - 1])
-                        return racessodata('1 de ' + mesesPt[achou[2] - 1] + ' de ' + achou[1] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(acessodata + nMesAno), subs: function (achou) {
-                    if (mesesPt[achou[1] - 1])
-                        return racessodata('1 de ' + mesesPt[achou[1] - 1] + ' de ' + achou[2] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(acessodata + sAnoMesDia), subs: function (achou) {
-                    return racessodata(achou[3] + ' de ' + tradMes(achou[2]) + ' de ' + achou[1] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + sDiaMesAno), subs: function (achou) {
-                    return racessodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + _0diaMesAno), subs: function (achou) {
-                    return racessodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + "\\s*([A-Za-zç]+)\\s+,?d?e?\\s*(\\d\\d\\d\\d?)\\.?"), subs: function (achou) {
-                    return racessodata('1 de ' + tradMes(achou[1]) + ' de ' + achou[2], achou[0]);
-                }
-            }, {
-                reg: new RegExp(acessodata + marco), subs: function (achou) {
-                    return racessodata(achou[1].replace(/[Mm]arco/, 'março'), achou[0]);
-                }
-            },
-            {
-                reg: new RegExp(publicacao + cvGrauO), subs: function (achou) {
-                    return rpublicacao(achou[1].replace('°', 'º'), achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + diaMesAno), subs: function (achou) {
-                    return rpublicacao(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + mesDiaAno), subs: function (achou) {
-                    return rpublicacao(achou[2].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[1]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + mesAno), subs: function (achou) {
-                    return rpublicacao(tradMes(achou[1]) + ' de ' + achou[2], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + diaMesVAno), subs: function (achou) {
-                    return rpublicacao(achou[1].replace(/[\-\/]/, '–') + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + mesAno), subs: function (achou) {
-                    return rpublicacao(tradMes(achou[1]) + ' de ' + achou[2], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + mesMesAno), subs: function (achou) {
-                    return rpublicacao(tradMes(achou[1]) + '–' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + nAnoMes), subs: function (achou) {
-                    if (mesesPt[achou[2] - 1])
-                        return rpublicacao(mesesPt[achou[2] - 1] + ' de ' + achou[1] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(publicacao + nMesAno), subs: function (achou) {
-                    if (mesesPt[achou[1] - 1])
-                        return rpublicacao(mesesPt[achou[1] - 1] + ' de ' + achou[2] + achou[3], achou[0]);
-                    else return achou[0];
-                }
-            }, {
-                reg: new RegExp(publicacao + sAnoMesDia), subs: function (achou) {
-                    return rpublicacao(achou[3] + ' de ' + tradMes(achou[2]) + ' de ' + achou[1] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + sDiaMesAno), subs: function (achou) {
-                    return rpublicacao(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(publicacao + _0diaMesAno), subs: function (achou) {
-                    return rpublicacao(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            },
-            {
-                reg: new RegExp(arquivodata + cvGrauO), subs: function (achou) {
-                    return rarquivodata(achou[1].replace('°', 'º'), achou[0]);
-                }
-            }, {
-                reg: new RegExp(arquivodata + diaMesAno), subs: function (achou) {
-                    return rarquivodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(arquivodata + mesDiaAno), subs: function (achou) {
-                    return rarquivodata(achou[2] + ' de ' + tradMes(achou[1]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(arquivodata + diaMesVAno), subs: function (achou) {
-                    return rarquivodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
-                }
-            }, {
-                reg: new RegExp(arquivodata + sAnoMesDia), subs: function (achou) {
-                    return rarquivodata(achou[3] + ' de ' + tradMes(achou[2]) + ' de ' + achou[1] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(arquivodata + sDiaMesAno), subs: function (achou) {
-                    return rarquivodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3] + achou[4], achou[0]);
-                }
-            }, {
-                reg: new RegExp(arquivodata + _0diaMesAno), subs: function (achou) {
-                    return rarquivodata(achou[1] + ' de ' + tradMes(achou[2]) + ' de ' + achou[3], achou[0]);
+                reg: /\|\s*(?:ano|year|data|transmissão|publicação|arquivodata|acessodata)\s*=\s*(.*)/, 
+                subs: function (match) {
+                    // Process the match based on its content
+                    if (/\d{4}\]\]/.test(match)) return '|ano=' + match.match(/\d{4}/)[0];
+                    if (/\d{4}/.test(match)) return processData(formatDate(match));
+                    return match; // Return original match if no conditions met
                 }
             }
-            /*, { reg: /\|\s*dat[ea]\s*=data=\s*([A-Za-zç]+)\s+d?e?\s*(\d\d\d\d?)/, subs: function(achou){
-                return '|data=' + tradMes(achou[1]) + ' de ' + achou[2];
-            } }*/
         ],
         sumario: 'ajustando datas'
     },
@@ -1836,10 +1607,21 @@ function subsTextoBox(janela) {
             }
         } while (comp != temp)
 
+        escape = 0;
+        do {
+            if (escape == 12) {
+                mw.notify("Parece haver algo errado ao aplicar ajustes gerais. Parando a execução");
+                return;
+            }
+            escape++;
+            comp = temp;
+            temp = mergeDuplicateRefs(temp);
+        } while (comp != temp)
+
         box.value = temp;
 
         if (sumario != '')
-            sumario += ' usando [[user:Luizdl/Script de ajustes.js|script]]';
+            sumario += ' usando [[user:TiagoLubiana/Script de ajustes.js|script]]';
         {
             var tmpSmr = sumarioEl.value;
             if (tmpSmr) sumario += (sumario ? ', ' : '') + tmpSmr;
